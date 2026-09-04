@@ -6,10 +6,22 @@
 
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+// index.html is served through the templated route below (key injection),
+// so static serving skips it and only handles other static assets.
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
+
+var indexTemplate = null;
+function getIndexHtml() {
+  if (indexTemplate === null) {
+    indexTemplate = fs.readFileSync(path.join(__dirname, "public", "index.html"), "utf8");
+  }
+  var mapsKey = process.env.GOOGLE_MAPS_API_KEY || "";
+  return indexTemplate.replace("__GOOGLE_MAPS_API_KEY__", mapsKey);
+}
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
@@ -66,9 +78,13 @@ app.post("/api/suggest", async (req, res) => {
 
 app.get("/healthz", (req, res) => res.status(200).send("ok"));
 
+app.get("/", (req, res) => {
+  res.type("html").send(getIndexHtml());
+});
+
 // Fallback: qualquer outra rota GET serve o front-end (SPA simples).
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.type("html").send(getIndexHtml());
 });
 
 const PORT = process.env.PORT || 3000;

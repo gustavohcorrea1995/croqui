@@ -60,11 +60,33 @@ sugestão por IA cai direto no modo local por palavras-chave.
    - `ANTHROPIC_API_KEY` = sua chave, criada em https://console.anthropic.com/settings/keys
    - (opcional) `ANTHROPIC_MODEL` = `claude-sonnet-5` (padrão) ou
      `claude-haiku-4-5-20251001` para respostas mais baratas/rápidas.
+   - `GOOGLE_MAPS_API_KEY` = sua chave do Google Maps (veja abaixo), para habilitar
+     a busca de endereço/CEP e o mapa de referência real.
 5. Clique em **Create Web Service**. O Render publica automaticamente e te
    dá uma URL pública (`https://seu-app.onrender.com`).
 
 Depois disso, todo `git push` no repositório redeploya o site
 automaticamente.
+
+## Configurando o Google Maps (busca por CEP/endereço)
+
+1. Acesse https://console.cloud.google.com e crie um projeto (ou use um existente).
+2. Em **APIs e Serviços > Biblioteca**, ative:
+   - **Maps JavaScript API**
+   - **Geocoding API**
+3. Em **APIs e Serviços > Credenciais**, clique em **Criar credenciais > Chave de API**.
+4. **Restrinja a chave** (importante, ela fica visível no código-fonte da página):
+   - Em "Restrições de aplicativo", escolha **Referenciadores HTTP (sites)** e
+     adicione `https://seu-app.onrender.com/*` (e `http://localhost:3000/*` se for
+     testar localmente).
+   - Em "Restrições de API", limite a chave às duas APIs ativadas acima.
+5. Copie a chave e configure como `GOOGLE_MAPS_API_KEY` no Render (ou no seu `.env` local).
+6. É necessário ter uma conta de faturamento (billing) vinculada ao projeto do
+   Google Cloud, mesmo usando a franquia gratuita mensal — sem isso as APIs não
+   funcionam, mesmo com a chave certa.
+
+Sem essa variável configurada, o restante do site funciona normalmente — só o
+botão "Mostrar mapa" avisa que o mapa não está configurado.
 
 ## Custos
 

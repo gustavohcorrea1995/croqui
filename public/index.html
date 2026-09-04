@@ -1,10 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Croqui de Colisão</title>
+<script>window.GOOGLE_MAPS_API_KEY = "__GOOGLE_MAPS_API_KEY__";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -280,6 +280,49 @@
     padding-top:12px;
     margin-top:6px;
   }
+
+  .location-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:12px 18px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .location-bar input{
+    flex:1;
+    min-width:220px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--ink);
+    border-radius:var(--radius);
+    padding:8px 10px;
+    font-size:13px;
+  }
+  .location-bar .btn{width:auto;padding:8px 12px;white-space:nowrap;}
+  #loc-status{font-size:12px;color:var(--ink-dim);width:100%;}
+  #loc-status.error{color:#e88a80;}
+  #loc-status.ok{color:#9fcf8f;}
+
+  #map-panel{
+    border-bottom:1px solid var(--border);
+    padding:14px 18px;
+  }
+  #gmap{
+    width:100%;
+    height:320px;
+    border-radius:var(--radius);
+    background:var(--panel-2);
+  }
+  .map-actions{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+  .map-actions .btn{width:auto;padding:7px 12px;}
+  #map-address-label{font-size:12px;color:var(--ink-dim);font-family:'IBM Plex Mono',monospace;}
 </style>
 </head>
 <body>
@@ -311,6 +354,21 @@
 
   <!-- CENTER: canvas -->
   <div class="canvas-wrap">
+    <div class="location-bar">
+      <input type="text" id="loc-query" placeholder="CEP ou endereço (ex: 80230-000 ou Av. das Torres, 100 - Curitiba)">
+      <button class="btn" id="loc-search-btn">Buscar no mapa</button>
+      <button class="btn" id="loc-toggle-btn">Mostrar mapa</button>
+      <span id="loc-status"></span>
+    </div>
+    <div id="map-panel" style="display:none;">
+      <div id="gmap"></div>
+      <div class="map-actions">
+        <button class="btn" id="btn-map-satellite" style="width:auto;">Satélite</button>
+        <button class="btn" id="btn-map-roadmap" style="width:auto;">Mapa</button>
+        <button class="btn primary" id="btn-use-address" style="width:auto;">Usar este endereço no cabeçalho</button>
+        <span id="map-address-label"></span>
+      </div>
+    </div>
     <div class="canvas-toolbar">
       <select id="via-tipo">
         <option value="reta_h">Via reta (horizontal)</option>
@@ -378,7 +436,8 @@
   var state = {
     via: { tipo: "reta_h", faixas: 2, sentido: "duplo" },
     elementos: [],
-    ctb: []
+    ctb: [],
+    location: null
   };
   var selectedId = null;
   var nextId = 1;
@@ -887,7 +946,8 @@
       },
       via: state.via,
       elementos: state.elementos,
-      ctb: state.ctb
+      ctb: state.ctb,
+      localizacao: state.location
     };
     var blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
     var a = document.createElement("a");
@@ -1156,6 +1216,124 @@
     if(isNaN(n)) return fallback;
     return Math.max(min, Math.min(max, n));
   }
+
+  // ---------- Google Maps (location reference) ----------
+  var gmapLoaded = false;
+  var gmapLoading = false;
+  var gmapCallbacks = [];
+  var map = null, marker = null, geocoder = null;
+
+  function ensureMapsLoaded(cb){
+    if(gmapLoaded){ cb(); return; }
+    gmapCallbacks.push(cb);
+    if(gmapLoading) return;
+    if(!window.GOOGLE_MAPS_API_KEY || window.GOOGLE_MAPS_API_KEY.indexOf("__GOOGLE_MAPS_API_KEY__") === 0 || window.GOOGLE_MAPS_API_KEY === ""){
+      showLocStatus("Mapa não configurado: falta a chave do Google Maps no servidor (GOOGLE_MAPS_API_KEY).", true);
+      gmapCallbacks = [];
+      return;
+    }
+    gmapLoading = true;
+    window.__onGoogleMapsLoaded = function(){
+      gmapLoaded = true;
+      gmapLoading = false;
+      gmapCallbacks.forEach(function(fn){ fn(); });
+      gmapCallbacks = [];
+    };
+    var script = document.createElement("script");
+    script.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(window.GOOGLE_MAPS_API_KEY) + "&callback=__onGoogleMapsLoaded";
+    script.async = true;
+    script.onerror = function(){
+      gmapLoading = false;
+      showLocStatus("Não foi possível carregar o Google Maps. Verifique a chave e as restrições configuradas.", true);
+      gmapCallbacks = [];
+    };
+    document.head.appendChild(script);
+  }
+
+  function initMapIfNeeded(){
+    if(map) return;
+    map = new google.maps.Map(document.getElementById("gmap"), {
+      center: {lat:-25.4284, lng:-49.2733}, // Curitiba, ajustado após a primeira busca
+      zoom: 13,
+      mapTypeId: "roadmap"
+    });
+    geocoder = new google.maps.Geocoder();
+    marker = new google.maps.Marker({ map: map, draggable: true, visible:false });
+    marker.addListener("dragend", function(){ reverseGeocode(marker.getPosition()); });
+  }
+
+  function showLocStatus(msg, isError){
+    var el = document.getElementById("loc-status");
+    el.textContent = msg;
+    el.className = isError ? "error" : "ok";
+  }
+
+  function updateAddressLabel(address, lat, lng){
+    document.getElementById("map-address-label").textContent = address || "";
+    state.location = { address: address || "", lat: lat, lng: lng };
+  }
+
+  function reverseGeocode(latLng){
+    geocoder.geocode({ location: latLng }, function(results, status){
+      if(status === "OK" && results[0]){
+        updateAddressLabel(results[0].formatted_address, latLng.lat(), latLng.lng());
+        showLocStatus("Local ajustado: " + results[0].formatted_address, false);
+      }
+    });
+  }
+
+  function doLocationSearch(){
+    var q = document.getElementById("loc-query").value.trim();
+    if(!q){ showLocStatus("Digite um CEP ou endereço para buscar.", true); return; }
+    showLocStatus("Buscando...", false);
+    ensureMapsLoaded(function(){
+      initMapIfNeeded();
+      var query = /brasil|brazil/i.test(q) ? q : (q + ", Brasil");
+      geocoder.geocode({ address: query }, function(results, status){
+        if(status === "OK" && results[0]){
+          var loc = results[0].geometry.location;
+          map.setCenter(loc);
+          map.setZoom(18);
+          marker.setPosition(loc);
+          marker.setVisible(true);
+          updateAddressLabel(results[0].formatted_address, loc.lat(), loc.lng());
+          showLocStatus("Encontrado: " + results[0].formatted_address + " (arraste o marcador para ajustar)", false);
+        } else {
+          showLocStatus("Endereço não encontrado (" + status + "). Tente um CEP ou endereço mais completo.", true);
+        }
+      });
+    });
+  }
+
+  document.getElementById("loc-search-btn").addEventListener("click", doLocationSearch);
+  document.getElementById("loc-query").addEventListener("keydown", function(e){ if(e.key === "Enter") doLocationSearch(); });
+
+  document.getElementById("loc-toggle-btn").addEventListener("click", function(){
+    var panel = document.getElementById("map-panel");
+    var showing = panel.style.display !== "none";
+    if(showing){
+      panel.style.display = "none";
+      this.textContent = "Mostrar mapa";
+    } else {
+      panel.style.display = "block";
+      this.textContent = "Ocultar mapa";
+      ensureMapsLoaded(function(){
+        initMapIfNeeded();
+        google.maps.event.trigger(map, "resize");
+      });
+    }
+  });
+
+  document.getElementById("btn-map-satellite").addEventListener("click", function(){ if(map) map.setMapTypeId("satellite"); });
+  document.getElementById("btn-map-roadmap").addEventListener("click", function(){ if(map) map.setMapTypeId("roadmap"); });
+
+  document.getElementById("btn-use-address").addEventListener("click", function(){
+    if(state.location && state.location.address){
+      document.getElementById("f-local").value = state.location.address;
+    } else {
+      showLocStatus("Busque um endereço primeiro.", true);
+    }
+  });
 
   // ---------- init ----------
   render();
