@@ -1,0 +1,15 @@
+{
+  "name": "croqui-colisao",
+  "version": "1.0.0",
+  "description": "Editor de croqui de colisões de trânsito com sugestão automática por IA e referências ao CTB.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
