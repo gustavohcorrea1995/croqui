@@ -88,6 +88,32 @@ automaticamente.
 Sem essa variável configurada, o restante do site funciona normalmente — só o
 botão "Mostrar mapa" avisa que o mapa não está configurado.
 
+## Análise visual do local pela IA (opcional)
+
+Além do mapa de referência, o site pode enviar uma **imagem de satélite do
+local buscado** para a IA analisar junto com o texto da dinâmica, deixando o
+croqui sugerido mais fiel à geometria real da via (cruzamento, rotatória,
+número aproximado de faixas, etc).
+
+Isso usa a **Maps Static API** do Google, chamada pelo próprio servidor (não
+pelo navegador). Como chamadas do servidor não têm cabeçalho "Referer", a
+mesma chave restrita por referenciador HTTP usada no navegador **não
+funciona** aqui — é preciso uma segunda chave:
+
+1. No mesmo projeto do Google Cloud, ative também a **Maps Static API**
+   (APIs e Serviços > Biblioteca).
+2. Crie uma **segunda chave de API** (Credenciais > Criar credenciais > Chave de API).
+3. Restrinja essa chave só por **API** (marque apenas "Maps Static API"), sem
+   restrição de referenciador/IP — como ela só é usada no servidor e nunca
+   aparece no navegador, isso é seguro. Se quiser uma camada extra de
+   segurança, configure um alerta de orçamento baixo para essa chave no
+   Google Cloud.
+4. Configure essa chave como `GOOGLE_STATIC_MAPS_API_KEY` no Render (variável
+   separada de `GOOGLE_MAPS_API_KEY`).
+
+Sem essa variável, a sugestão por IA continua funcionando normalmente — só
+não recebe a imagem de satélite como referência, usando apenas o texto.
+
 ## Custos
 
 - Hospedagem no Render: o plano **Free** funciona para testar, mas "dorme"

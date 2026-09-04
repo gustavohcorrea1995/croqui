@@ -406,6 +406,7 @@
     <textarea id="dyn-text" placeholder="Ex: Veículo A trafegava pela Av. X sentido norte-sul, na faixa da esquerda, quando o veículo B, que vinha pela via transversal, avançou o sinal de PARE e colidiu contra a lateral direita do veículo A no meio do cruzamento..."></textarea>
     <button class="btn primary" id="btn-ai">Sugerir croqui com IA</button>
     <div id="ai-status"></div>
+    <p id="ai-location-hint" style="font-size:11px;color:var(--ink-dim);line-height:1.5;margin:-2px 0 0;display:none;">📍 Vai usar a imagem de satélite do local buscado como referência visual.</p>
     <p style="font-size:11px;color:var(--ink-dim);line-height:1.5;margin:-2px 0 0;">Se a IA online estiver indisponível (ex: chave de API não configurada no servidor), uma versão local por palavras-chave é usada automaticamente como alternativa.</p>
 
     <h2 class="spaced">Elemento selecionado</h2>
@@ -1032,10 +1033,15 @@
     statusEl.textContent = "Gerando sugestão...";
     statusEl.className = "";
 
+    var body = { text: text };
+    if (state.location && typeof state.location.lat === "number" && typeof state.location.lng === "number") {
+      body.location = state.location;
+    }
+
     fetch("/api/suggest", {
       method: "POST",
       headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify(body)
     })
     .then(function(r){
       return r.json().then(function(data){
@@ -1055,7 +1061,10 @@
       if(!raw) throw new Error("Resposta vazia da IA.");
       var parsed = extractJson(raw);
       applySuggestion(parsed);
-      statusEl.textContent = "Sugestão aplicada. Ajuste os elementos conforme necessário.";
+      var usedMap = data && data._usedMapImage;
+      statusEl.textContent = usedMap
+        ? "Sugestão aplicada com base no mapa de satélite do local buscado. Ajuste os elementos conforme necessário."
+        : "Sugestão aplicada. Ajuste os elementos conforme necessário.";
       statusEl.className = "ok";
     })
     .catch(function(err){
@@ -1271,6 +1280,8 @@
   function updateAddressLabel(address, lat, lng){
     document.getElementById("map-address-label").textContent = address || "";
     state.location = { address: address || "", lat: lat, lng: lng };
+    var hint = document.getElementById("ai-location-hint");
+    if(hint) hint.style.display = "block";
   }
 
   function reverseGeocode(latLng){
