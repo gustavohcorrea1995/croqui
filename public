@@ -1,1 +1,1166 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Croqui de Colisão</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#151b24;
+    --panel:#1c2430;
+    --panel-2:#212b39;
+    --ink:#e9e6dc;
+    --ink-dim:#9aa4b2;
+    --paper:#efe9d6;
+    --grid-line:#d9d0b4;
+    --road:#5c6067;
+    --road-edge:#f4f1e6;
+    --accent:#e2672b;
+    --accent-2:#f2b705;
+    --blueprint:#4d84ad;
+    --danger:#b4362b;
+    --border:#2e3a4a;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header.app{
+    padding:22px 28px 16px;
+    border-bottom:1px solid var(--border);
+  }
+  header.app h1{
+    margin:0 0 2px;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:0.2px;
+  }
+  header.app p{
+    margin:0 0 16px;
+    color:var(--ink-dim);
+    font-size:13px;
+    max-width:640px;
+    line-height:1.5;
+  }
+  .head-fields{
+    display:flex;
+    flex-wrap:wrap;
+    gap:18px 26px;
+  }
+  .head-fields label{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    font-size:11px;
+    color:var(--ink-dim);
+    text-transform:none;
+  }
+  .head-fields input{
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--border);
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    padding:4px 2px;
+    width:170px;
+  }
+  .head-fields input:focus{outline:none;border-bottom-color:var(--accent);}
+
+  .layout{
+    display:grid;
+    grid-template-columns:220px 1fr 320px;
+    gap:0;
+    min-height:calc(100vh - 128px);
+  }
+  @media (max-width:980px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    padding:18px 16px;
+    overflow-y:auto;
+  }
+  .panel.right{border-right:none;border-left:1px solid var(--border);}
+
+  .panel h2{
+    font-size:11px;
+    letter-spacing:0.06em;
+    color:var(--ink-dim);
+    margin:0 0 10px;
+    font-weight:600;
+  }
+  .panel h2.spaced{margin-top:22px;}
+
+  .palette-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .palette-item{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:8px 6px 6px;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    transition:border-color .12s;
+  }
+  .palette-item:hover{border-color:var(--accent);}
+  .palette-item svg{width:36px;height:26px;}
+  .palette-item span{font-size:10px;color:var(--ink-dim);text-align:center;line-height:1.2;}
+
+  select, .btn, textarea{
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  select{
+    width:100%;
+    background:var(--panel-2);
+    color:var(--ink);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:7px 8px;
+    font-size:13px;
+    margin-bottom:8px;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--ink);
+    padding:8px 12px;
+    border-radius:var(--radius);
+    font-size:13px;
+    cursor:pointer;
+    width:100%;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#1a1006;
+    font-weight:600;
+  }
+  .btn.primary:hover{background:#ee7539;}
+  .btn.danger{color:var(--danger);}
+  .btn:disabled{opacity:0.5;cursor:default;}
+
+  .canvas-wrap{
+    display:flex;
+    flex-direction:column;
+    background:var(--bg);
+  }
+  .canvas-toolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 18px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .canvas-toolbar select{width:auto;min-width:150px;margin:0;}
+  .canvas-toolbar .spacer{flex:1;}
+  .canvas-toolbar .btn{width:auto;padding:7px 12px;}
+
+  .canvas-stage{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:22px;
+    overflow:auto;
+  }
+  #stage-svg{
+    background:var(--paper);
+    border-radius:2px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.45);
+    max-width:100%;
+    height:auto;
+    cursor:default;
+  }
+  .el-group{cursor:grab;}
+  .el-group:active{cursor:grabbing;}
+
+  textarea#dyn-text{
+    width:100%;
+    min-height:130px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--ink);
+    border-radius:var(--radius);
+    padding:9px;
+    font-size:13px;
+    line-height:1.4;
+    resize:vertical;
+    margin-bottom:8px;
+  }
+  #ai-status{
+    font-size:12px;
+    color:var(--ink-dim);
+    margin:4px 0 12px;
+    min-height:16px;
+  }
+  #ai-status.error{color:#e88a80;}
+  #ai-status.ok{color:#9fcf8f;}
+
+  .props-box{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:12px;
+    margin-bottom:18px;
+  }
+  .props-box p.empty{color:var(--ink-dim);font-size:12px;margin:0;}
+  .props-field{margin-bottom:8px;}
+  .props-field label{
+    display:block;
+    font-size:10px;
+    color:var(--ink-dim);
+    margin-bottom:3px;
+  }
+  .props-field input{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--ink);
+    border-radius:var(--radius);
+    padding:6px 7px;
+    font-size:12px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  .ctb-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px;}
+  .ctb-item{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-left:3px solid var(--blueprint);
+    border-radius:var(--radius);
+    padding:8px 9px;
+    font-size:12px;
+    position:relative;
+  }
+  .ctb-item strong{display:block;font-size:11.5px;color:var(--accent-2);margin-bottom:2px;}
+  .ctb-item .rm{
+    position:absolute;top:6px;right:7px;
+    background:none;border:none;color:var(--ink-dim);
+    cursor:pointer;font-size:12px;
+  }
+  .ctb-add{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+  .ctb-add input{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--ink);
+    border-radius:var(--radius);padding:6px 8px;font-size:12px;
+  }
+
+  .disclaimer{
+    font-size:11px;
+    color:var(--ink-dim);
+    line-height:1.5;
+    border-top:1px solid var(--border);
+    padding-top:12px;
+    margin-top:6px;
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>Croqui de Colisão</h1>
+  <p>Descreva a dinâmica do acidente, deixe a IA sugerir um layout inicial e ajuste os elementos manualmente. Ferramenta de apoio — não substitui perícia técnica.</p>
+  <div class="head-fields">
+    <label>Local / Via <input id="f-local" placeholder="Ex: Av. das Torres, km 4" class="mono"></label>
+    <label>Data <input id="f-data" type="date" class="mono"></label>
+    <label>Hora <input id="f-hora" type="time" class="mono"></label>
+    <label>Nº do registro <input id="f-numero" placeholder="BO / sinistro nº" class="mono"></label>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: palette -->
+  <div class="panel left">
+    <h2>Veículos</h2>
+    <div class="palette-grid" id="pal-veiculos"></div>
+
+    <h2 class="spaced">Sinalização</h2>
+    <div class="palette-grid" id="pal-sinalizacao"></div>
+
+    <h2 class="spaced">Marcadores</h2>
+    <div class="palette-grid" id="pal-marcadores"></div>
+  </div>
+
+  <!-- CENTER: canvas -->
+  <div class="canvas-wrap">
+    <div class="canvas-toolbar">
+      <select id="via-tipo">
+        <option value="reta_h">Via reta (horizontal)</option>
+        <option value="reta_v">Via reta (vertical)</option>
+        <option value="cruzamento">Cruzamento</option>
+        <option value="rotatoria">Rotatória</option>
+        <option value="curva">Curva</option>
+      </select>
+      <select id="via-faixas">
+        <option value="1">1 faixa</option>
+        <option value="2" selected>2 faixas</option>
+        <option value="3">3 faixas</option>
+        <option value="4">4 faixas</option>
+      </select>
+      <select id="via-sentido">
+        <option value="duplo">Mão dupla</option>
+        <option value="unico">Mão única</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn" id="btn-clear">Limpar croqui</button>
+      <button class="btn" id="btn-export-json">Exportar JSON</button>
+      <button class="btn primary" id="btn-export-png">Baixar PNG</button>
+    </div>
+    <div class="canvas-stage">
+      <svg id="stage-svg" viewBox="0 0 1000 650" width="1000" height="650" xmlns="http://www.w3.org/2000/svg">
+        <g id="layer-via"></g>
+        <g id="layer-elementos"></g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- RIGHT: AI + properties + CTB -->
+  <div class="panel right">
+    <h2>Dinâmica da colisão</h2>
+    <textarea id="dyn-text" placeholder="Ex: Veículo A trafegava pela Av. X sentido norte-sul, na faixa da esquerda, quando o veículo B, que vinha pela via transversal, avançou o sinal de PARE e colidiu contra a lateral direita do veículo A no meio do cruzamento..."></textarea>
+    <button class="btn primary" id="btn-ai">Sugerir croqui com IA</button>
+    <div id="ai-status"></div>
+    <p style="font-size:11px;color:var(--ink-dim);line-height:1.5;margin:-2px 0 0;">Se a IA online estiver indisponível (ex: chave de API não configurada no servidor), uma versão local por palavras-chave é usada automaticamente como alternativa.</p>
+
+    <h2 class="spaced">Elemento selecionado</h2>
+    <div class="props-box" id="props-box">
+      <p class="empty">Clique em um elemento no croqui para editar.</p>
+    </div>
+
+    <h2 class="spaced">Referências ao CTB</h2>
+    <ul class="ctb-list" id="ctb-list"></ul>
+    <div class="ctb-add">
+      <input id="ctb-art" placeholder="Artigo (ex: Art. 44)">
+      <input id="ctb-desc" placeholder="Descrição breve">
+      <button class="btn" id="btn-ctb-add">Adicionar referência</button>
+    </div>
+    <p class="disclaimer">As referências ao CTB — geradas por IA ou inseridas manualmente — são sugestões de apoio e podem estar incompletas ou desatualizadas. Confira sempre o texto oficial da Lei nº 9.503/1997 antes de usar em laudo, boletim ou regulação de sinistro.</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var CW = 1000, CH = 650;
+
+  // ---------- state ----------
+  var state = {
+    via: { tipo: "reta_h", faixas: 2, sentido: "duplo" },
+    elementos: [],
+    ctb: []
+  };
+  var selectedId = null;
+  var nextId = 1;
+
+  // ---------- icon definitions ----------
+  // each icon: {w, h, svg(fillOverride)} local coords centered at 0,0, "facing" = +x (east)
+  var ICONS = {
+    carro: {
+      w:44, h:22, label:"Carro",
+      svg:function(){ return ''
+        + '<rect x="-22" y="-11" rx="4" ry="4" width="44" height="22" fill="var(--blueprint)" stroke="#1c2430" stroke-width="1.2"/>'
+        + '<rect x="-13" y="-7" width="16" height="14" fill="#eef3f7" opacity="0.55"/>'
+        + '<polygon points="22,0 14,-7 14,7" fill="#1c2430"/>';
+      }
+    },
+    moto: {
+      w:26, h:11, label:"Moto",
+      svg:function(){ return ''
+        + '<rect x="-13" y="-5.5" rx="3" ry="3" width="26" height="11" fill="var(--accent)" stroke="#1c2430" stroke-width="1"/>'
+        + '<polygon points="13,0 8,-4 8,4" fill="#1c2430"/>';
+      }
+    },
+    caminhao: {
+      w:60, h:24, label:"Caminhão",
+      svg:function(){ return ''
+        + '<rect x="-30" y="-12" width="42" height="24" fill="#7a828c" stroke="#1c2430" stroke-width="1.2"/>'
+        + '<rect x="12" y="-9" width="18" height="18" fill="var(--blueprint)" stroke="#1c2430" stroke-width="1.2"/>'
+        + '<polygon points="30,0 24,-6 24,6" fill="#1c2430"/>';
+      }
+    },
+    onibus: {
+      w:66, h:22, label:"Ônibus",
+      svg:function(){ return ''
+        + '<rect x="-33" y="-11" rx="3" width="66" height="22" fill="var(--accent-2)" stroke="#1c2430" stroke-width="1.2"/>'
+        + '<line x1="-20" y1="-11" x2="-20" y2="11" stroke="#1c2430" stroke-width="0.8" opacity="0.5"/>'
+        + '<line x1="0" y1="-11" x2="0" y2="11" stroke="#1c2430" stroke-width="0.8" opacity="0.5"/>'
+        + '<line x1="20" y1="-11" x2="20" y2="11" stroke="#1c2430" stroke-width="0.8" opacity="0.5"/>'
+        + '<polygon points="33,0 27,-6 27,6" fill="#1c2430"/>';
+      }
+    },
+    bicicleta: {
+      w:26, h:12, label:"Bicicleta",
+      svg:function(){ return ''
+        + '<circle cx="-8" cy="4" r="6" fill="none" stroke="#1c2430" stroke-width="1.6"/>'
+        + '<circle cx="8" cy="4" r="6" fill="none" stroke="#1c2430" stroke-width="1.6"/>'
+        + '<polyline points="-8,4 0,-6 8,4" fill="none" stroke="#3d7a3d" stroke-width="2"/>'
+        + '<line x1="0" y1="-6" x2="4" y2="4" stroke="#3d7a3d" stroke-width="2"/>';
+      }
+    },
+    pedestre: {
+      w:16, h:20, label:"Pedestre",
+      svg:function(){ return ''
+        + '<circle cx="0" cy="-6" r="4" fill="#1c2430"/>'
+        + '<line x1="0" y1="-2" x2="0" y2="6" stroke="#1c2430" stroke-width="2.4"/>'
+        + '<line x1="0" y1="6" x2="-5" y2="15" stroke="#1c2430" stroke-width="2.2"/>'
+        + '<line x1="0" y1="6" x2="5" y2="15" stroke="#1c2430" stroke-width="2.2"/>'
+        + '<line x1="0" y1="0" x2="-7" y2="-3" stroke="#1c2430" stroke-width="2"/>'
+        + '<line x1="0" y1="0" x2="7" y2="-3" stroke="#1c2430" stroke-width="2"/>';
+      }
+    },
+    semaforo: {
+      w:14, h:30, label:"Semáforo",
+      svg:function(){ return ''
+        + '<rect x="-6" y="-15" width="12" height="30" rx="2" fill="#2b2f36" stroke="#1c2430" stroke-width="1"/>'
+        + '<circle cx="0" cy="-9" r="3.2" fill="#c0392b"/>'
+        + '<circle cx="0" cy="0" r="3.2" fill="#e6b800"/>'
+        + '<circle cx="0" cy="9" r="3.2" fill="#3d9140"/>';
+      }
+    },
+    placa_pare: {
+      w:20, h:20, label:"Placa PARE",
+      svg:function(){ return ''
+        + '<polygon points="-7,-14 7,-14 14,-7 14,7 7,14 -7,14 -14,7 -14,-7" fill="#b4362b" stroke="#1c2430" stroke-width="1.2"/>'
+        + '<text x="0" y="4" font-size="7" font-family="IBM Plex Sans" font-weight="700" fill="#fff" text-anchor="middle">PARE</text>';
+      }
+    },
+    faixa_pedestre: {
+      w:40, h:16, label:"Faixa de pedestre",
+      svg:function(){
+        var s='';
+        for(var i=0;i<5;i++){ s+='<rect x="'+(-20+i*8)+'" y="-8" width="4" height="16" fill="#f4f1e6" stroke="#1c2430" stroke-width="0.5"/>'; }
+        return s;
+      }
+    },
+    radar: {
+      w:14, h:18, label:"Radar",
+      svg:function(){ return ''
+        + '<rect x="-5" y="-9" width="10" height="18" rx="2" fill="#3a3f47" stroke="#1c2430" stroke-width="1"/>'
+        + '<circle cx="0" cy="-3" r="3" fill="#e2672b"/>';
+      }
+    },
+    ponto_colisao: {
+      w:26, h:26, label:"Ponto de colisão",
+      svg:function(){ return ''
+        + '<circle cx="0" cy="0" r="12" fill="none" stroke="#b4362b" stroke-width="1.4" opacity="0.5"/>'
+        + '<line x1="-8" y1="-8" x2="8" y2="8" stroke="#b4362b" stroke-width="3" stroke-linecap="round"/>'
+        + '<line x1="-8" y1="8" x2="8" y2="-8" stroke="#b4362b" stroke-width="3" stroke-linecap="round"/>';
+      }
+    },
+    texto: {
+      w:80, h:16, label:"Texto livre",
+      svg:function(el){ return '<text x="0" y="5" font-size="13" font-family="IBM Plex Mono" fill="#1c2430" text-anchor="middle">'+escapeXml(el && el.label ? el.label : "texto")+'</text>'; }
+    },
+    seta: {
+      w:120, h:20, label:"Seta / trajetória",
+      svg:function(el){
+        var len = (el && el.extra && el.extra.length) ? el.extra.length : 120;
+        return ''
+          + '<line x1="0" y1="0" x2="'+(len-10)+'" y2="0" stroke="#2c333c" stroke-width="2.2" stroke-dasharray="7,5"/>'
+          + '<polygon points="'+len+',0 '+(len-11)+',-5 '+(len-11)+',5'+'" fill="#2c333c"/>';
+      }
+    }
+  };
+
+  var PALETTE = {
+    "pal-veiculos": ["carro","moto","caminhao","onibus","bicicleta","pedestre"],
+    "pal-sinalizacao": ["semaforo","placa_pare","faixa_pedestre","radar"],
+    "pal-marcadores": ["ponto_colisao","seta","texto"]
+  };
+
+  function escapeXml(s){
+    return String(s).replace(/[<>&"]/g, function(c){
+      return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];
+    });
+  }
+
+  // ---------- build palette UI ----------
+  Object.keys(PALETTE).forEach(function(containerId){
+    var container = document.getElementById(containerId);
+    PALETTE[containerId].forEach(function(tipo){
+      var def = ICONS[tipo];
+      var item = document.createElement("div");
+      item.className = "palette-item";
+      item.title = "Adicionar " + def.label;
+      var svg = document.createElementNS(SVG_NS,"svg");
+      svg.setAttribute("viewBox","-30 -20 60 40");
+      var g = document.createElementNS(SVG_NS,"g");
+      g.innerHTML = def.svg();
+      svg.appendChild(g);
+      item.appendChild(svg);
+      var span = document.createElement("span");
+      span.textContent = def.label;
+      item.appendChild(span);
+      item.addEventListener("click", function(){ addElement(tipo); });
+      container.appendChild(item);
+    });
+  });
+
+  // ---------- element management ----------
+  function addElement(tipo, opts){
+    opts = opts || {};
+    var count = state.elementos.filter(function(e){return e.tipo===tipo;}).length;
+    var el = {
+      id: "el" + (nextId++),
+      tipo: tipo,
+      x: opts.x != null ? opts.x : (200 + (count % 5) * 90),
+      y: opts.y != null ? opts.y : (120 + Math.floor(count/5) * 70),
+      rot: opts.rot != null ? opts.rot : 0,
+      label: opts.label != null ? opts.label : (tipo === "texto" ? "texto" : (ICONS[tipo].label + (count>0? " "+(count+1):""))),
+      extra: opts.extra || (tipo === "seta" ? {length:120} : {})
+    };
+    state.elementos.push(el);
+    selectedId = el.id;
+    render();
+  }
+
+  function removeElement(id){
+    state.elementos = state.elementos.filter(function(e){return e.id!==id;});
+    if(selectedId===id) selectedId=null;
+    render();
+  }
+
+  function getSelected(){
+    return state.elementos.find(function(e){return e.id===selectedId;});
+  }
+
+  // ---------- via (road) rendering ----------
+  function laneLines(bandFrom, bandTo, count, sentido, orientation, layerVia){
+    // orientation: 'h' band spans y[bandFrom,bandTo] full width; 'v' spans x[bandFrom,bandTo] full height
+    var n = count - 1;
+    if(n <= 0) return;
+    for(var i=1;i<=n;i++){
+      var pos = bandFrom + (bandTo-bandFrom) * (i/count);
+      var isCenter = (sentido === "duplo") && (n % 2 === 1) && (i === Math.ceil(n/2));
+      var line = document.createElementNS(SVG_NS,"line");
+      if(orientation==="h"){
+        line.setAttribute("x1", 0); line.setAttribute("x2", CW);
+        line.setAttribute("y1", pos); line.setAttribute("y2", pos);
+      } else {
+        line.setAttribute("y1", 0); line.setAttribute("y2", CH);
+        line.setAttribute("x1", pos); line.setAttribute("x2", pos);
+      }
+      if(isCenter){
+        line.setAttribute("stroke","var(--blueprint)");
+        line.setAttribute("stroke-width","2.4");
+      } else {
+        line.setAttribute("stroke","var(--road-edge)");
+        line.setAttribute("stroke-width","2");
+        line.setAttribute("stroke-dasharray","14,10");
+      }
+      layerVia.appendChild(line);
+    }
+  }
+
+  function edgeLines(bandFrom, bandTo, orientation, layerVia){
+    [bandFrom, bandTo].forEach(function(pos){
+      var line = document.createElementNS(SVG_NS,"line");
+      if(orientation==="h"){
+        line.setAttribute("x1", 0); line.setAttribute("x2", CW);
+        line.setAttribute("y1", pos); line.setAttribute("y2", pos);
+      } else {
+        line.setAttribute("y1", 0); line.setAttribute("y2", CH);
+        line.setAttribute("x1", pos); line.setAttribute("x2", pos);
+      }
+      line.setAttribute("stroke","var(--road-edge)");
+      line.setAttribute("stroke-width","2.5");
+      layerVia.appendChild(line);
+    });
+  }
+
+  function drawBand(bandFrom, bandTo, orientation, layerVia){
+    var rect = document.createElementNS(SVG_NS,"rect");
+    if(orientation==="h"){
+      rect.setAttribute("x",0); rect.setAttribute("y",bandFrom);
+      rect.setAttribute("width",CW); rect.setAttribute("height",bandTo-bandFrom);
+    } else {
+      rect.setAttribute("y",0); rect.setAttribute("x",bandFrom);
+      rect.setAttribute("height",CH); rect.setAttribute("width",bandTo-bandFrom);
+    }
+    rect.setAttribute("fill","var(--road)");
+    layerVia.appendChild(rect);
+  }
+
+  function renderVia(){
+    var layerVia = document.getElementById("layer-via");
+    layerVia.innerHTML = "";
+
+    // background grid paper
+    var bg = document.createElementNS(SVG_NS,"rect");
+    bg.setAttribute("x",0); bg.setAttribute("y",0);
+    bg.setAttribute("width",CW); bg.setAttribute("height",CH);
+    bg.setAttribute("fill","var(--paper)");
+    layerVia.appendChild(bg);
+    for(var gx=0; gx<=CW; gx+=25){
+      var l1=document.createElementNS(SVG_NS,"line");
+      l1.setAttribute("x1",gx); l1.setAttribute("x2",gx);
+      l1.setAttribute("y1",0); l1.setAttribute("y2",CH);
+      l1.setAttribute("stroke","var(--grid-line)"); l1.setAttribute("stroke-width","0.5");
+      layerVia.appendChild(l1);
+    }
+    for(var gy=0; gy<=CH; gy+=25){
+      var l2=document.createElementNS(SVG_NS,"line");
+      l2.setAttribute("y1",gy); l2.setAttribute("y2",gy);
+      l2.setAttribute("x1",0); l2.setAttribute("x2",CW);
+      l2.setAttribute("stroke","var(--grid-line)"); l2.setAttribute("stroke-width","0.5");
+      layerVia.appendChild(l2);
+    }
+
+    var faixas = state.via.faixas, sentido = state.via.sentido, tipo = state.via.tipo;
+    var bandW = 60 + faixas*38;
+
+    if(tipo === "reta_h"){
+      var from = CH/2 - bandW/2, to = CH/2 + bandW/2;
+      drawBand(from,to,"h",layerVia);
+      edgeLines(from,to,"h",layerVia);
+      laneLines(from,to,faixas,sentido,"h",layerVia);
+    } else if(tipo === "reta_v"){
+      var fromV = CW/2 - bandW/2, toV = CW/2 + bandW/2;
+      drawBand(fromV,toV,"v",layerVia);
+      edgeLines(fromV,toV,"v",layerVia);
+      laneLines(fromV,toV,faixas,sentido,"v",layerVia);
+    } else if(tipo === "cruzamento"){
+      var fh0 = CH/2-bandW/2, fh1 = CH/2+bandW/2;
+      var fv0 = CW/2-bandW/2, fv1 = CW/2+bandW/2;
+      drawBand(fh0,fh1,"h",layerVia);
+      drawBand(fv0,fv1,"v",layerVia);
+      edgeLines(fh0,fh1,"h",layerVia);
+      edgeLines(fv0,fv1,"v",layerVia);
+      laneLines(fh0,fh1,faixas,sentido,"h",layerVia);
+      laneLines(fv0,fv1,faixas,sentido,"v",layerVia);
+    } else if(tipo === "rotatoria"){
+      var cx=CW/2, cy=CH/2, rOuter=170, rInner=80;
+      var ring = document.createElementNS(SVG_NS,"circle");
+      ring.setAttribute("cx",cx); ring.setAttribute("cy",cy); ring.setAttribute("r",(rOuter+rInner)/2);
+      ring.setAttribute("fill","none");
+      ring.setAttribute("stroke","var(--road)");
+      ring.setAttribute("stroke-width", rOuter-rInner);
+      layerVia.appendChild(ring);
+      var inner = document.createElementNS(SVG_NS,"circle");
+      inner.setAttribute("cx",cx); inner.setAttribute("cy",cy); inner.setAttribute("r",rInner);
+      inner.setAttribute("fill","var(--paper)");
+      inner.setAttribute("stroke","var(--road-edge)");
+      inner.setAttribute("stroke-width","2.5");
+      layerVia.appendChild(inner);
+      var outer = document.createElementNS(SVG_NS,"circle");
+      outer.setAttribute("cx",cx); outer.setAttribute("cy",cy); outer.setAttribute("r",rOuter);
+      outer.setAttribute("fill","none");
+      outer.setAttribute("stroke","var(--road-edge)");
+      outer.setAttribute("stroke-width","2.5");
+      layerVia.appendChild(outer);
+      // 4 approach roads
+      [[cx,0,cx,cy-rOuter],[cx,CH,cx,cy+rOuter],[0,cy,cx-rOuter,cy],[CW,cy,cx+rOuter,cy]].forEach(function(p){
+        var seg=document.createElementNS(SVG_NS,"line");
+        seg.setAttribute("x1",p[0]); seg.setAttribute("y1",p[1]);
+        seg.setAttribute("x2",p[2]); seg.setAttribute("y2",p[3]);
+        seg.setAttribute("stroke","var(--road)"); seg.setAttribute("stroke-width", bandW*0.55);
+        layerVia.insertBefore(seg, ring);
+      });
+    } else if(tipo === "curva"){
+      var path = document.createElementNS(SVG_NS,"path");
+      path.setAttribute("d","M 60 560 C 260 560, 340 260, 640 200 C 820 165, 900 140, 940 60");
+      path.setAttribute("fill","none");
+      path.setAttribute("stroke","var(--road)");
+      path.setAttribute("stroke-width", bandW);
+      path.setAttribute("stroke-linecap","round");
+      layerVia.appendChild(path);
+      var path2 = document.createElementNS(SVG_NS,"path");
+      path2.setAttribute("d","M 60 560 C 260 560, 340 260, 640 200 C 820 165, 900 140, 940 60");
+      path2.setAttribute("fill","none");
+      path2.setAttribute("stroke","var(--road-edge)");
+      path2.setAttribute("stroke-width","2");
+      path2.setAttribute("stroke-dasharray","14,10");
+      layerVia.appendChild(path2);
+    }
+  }
+
+  // ---------- elements rendering ----------
+  function render(){
+    renderVia();
+    var layer = document.getElementById("layer-elementos");
+    layer.innerHTML = "";
+    state.elementos.forEach(function(el){
+      var def = ICONS[el.tipo];
+      var g = document.createElementNS(SVG_NS,"g");
+      g.setAttribute("class","el-group");
+      g.setAttribute("transform","translate("+el.x+","+el.y+") rotate("+el.rot+")");
+      g.setAttribute("data-id", el.id);
+      g.innerHTML = def.svg(el);
+
+      if(el.id === selectedId){
+        var sel = document.createElementNS(SVG_NS,"rect");
+        var pad = 6;
+        sel.setAttribute("x", -def.w/2 - pad);
+        sel.setAttribute("y", -def.h/2 - pad);
+        sel.setAttribute("width", def.w + pad*2);
+        sel.setAttribute("height", def.h + pad*2);
+        sel.setAttribute("fill","none");
+        sel.setAttribute("stroke","var(--accent)");
+        sel.setAttribute("stroke-width","1.4");
+        sel.setAttribute("stroke-dasharray","4,3");
+        g.insertBefore(sel, g.firstChild);
+      }
+
+      if(el.tipo !== "texto"){
+        var lbl = document.createElementNS(SVG_NS,"text");
+        lbl.setAttribute("x", 0);
+        lbl.setAttribute("y", def.h/2 + 13);
+        lbl.setAttribute("font-size","9.5");
+        lbl.setAttribute("font-family","IBM Plex Mono");
+        lbl.setAttribute("fill","#3a3f47");
+        lbl.setAttribute("text-anchor","middle");
+        lbl.setAttribute("transform","rotate("+(-el.rot)+")");
+        lbl.textContent = el.label;
+        g.appendChild(lbl);
+      }
+
+      g.addEventListener("pointerdown", function(ev){ startDrag(ev, el.id); });
+      layer.appendChild(g);
+    });
+    renderProps();
+  }
+
+  // ---------- dragging ----------
+  var dragState = null;
+  var svgEl = document.getElementById("stage-svg");
+
+  function svgPoint(clientX, clientY){
+    var pt = svgEl.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    var ctm = svgEl.getScreenCTM().inverse();
+    var p = pt.matrixTransform(ctm);
+    return {x:p.x, y:p.y};
+  }
+
+  function startDrag(ev, id){
+    ev.stopPropagation();
+    selectedId = id;
+    var el = getSelected();
+    var p = svgPoint(ev.clientX, ev.clientY);
+    dragState = { id:id, offX: el.x - p.x, offY: el.y - p.y };
+    render();
+    window.addEventListener("pointermove", onDrag);
+    window.addEventListener("pointerup", endDrag);
+  }
+  function onDrag(ev){
+    if(!dragState) return;
+    var el = state.elementos.find(function(e){return e.id===dragState.id;});
+    if(!el) return;
+    var p = svgPoint(ev.clientX, ev.clientY);
+    el.x = Math.max(0, Math.min(CW, p.x + dragState.offX));
+    el.y = Math.max(0, Math.min(CH, p.y + dragState.offY));
+    render();
+  }
+  function endDrag(){
+    dragState = null;
+    window.removeEventListener("pointermove", onDrag);
+    window.removeEventListener("pointerup", endDrag);
+  }
+  svgEl.addEventListener("pointerdown", function(ev){
+    if(ev.target === svgEl || ev.target.tagName === "rect" && ev.target.parentNode && ev.target.parentNode.id === "layer-via"){
+      selectedId = null;
+      render();
+    }
+  });
+
+  // ---------- properties panel ----------
+  function renderProps(){
+    var box = document.getElementById("props-box");
+    var el = getSelected();
+    if(!el){
+      box.innerHTML = '<p class="empty">Clique em um elemento no croqui para editar.</p>';
+      return;
+    }
+    var def = ICONS[el.tipo];
+    var lengthField = el.tipo === "seta" ? (''
+      + '<div class="props-field"><label>Comprimento</label><input type="number" id="pf-length" value="'+(el.extra.length||120)+'"></div>') : "";
+    box.innerHTML = ''
+      + '<div class="props-field"><label>'+def.label+' — Rótulo</label><input type="text" id="pf-label" value="'+escapeXml(el.label)+'"></div>'
+      + '<div class="row2">'
+      +   '<div class="props-field"><label>X</label><input type="number" id="pf-x" value="'+Math.round(el.x)+'"></div>'
+      +   '<div class="props-field"><label>Y</label><input type="number" id="pf-y" value="'+Math.round(el.y)+'"></div>'
+      + '</div>'
+      + '<div class="props-field"><label>Rotação (graus)</label><input type="number" id="pf-rot" value="'+el.rot+'"></div>'
+      + lengthField
+      + '<button class="btn danger" id="pf-delete" style="margin-top:6px;">Remover elemento</button>';
+
+    document.getElementById("pf-label").addEventListener("input", function(e){ el.label = e.target.value; render(); });
+    document.getElementById("pf-x").addEventListener("input", function(e){ el.x = Number(e.target.value)||0; render(); });
+    document.getElementById("pf-y").addEventListener("input", function(e){ el.y = Number(e.target.value)||0; render(); });
+    document.getElementById("pf-rot").addEventListener("input", function(e){ el.rot = Number(e.target.value)||0; render(); });
+    if(el.tipo === "seta"){
+      document.getElementById("pf-length").addEventListener("input", function(e){ el.extra.length = Number(e.target.value)||120; render(); });
+    }
+    document.getElementById("pf-delete").addEventListener("click", function(){ removeElement(el.id); });
+  }
+
+  // ---------- via controls ----------
+  document.getElementById("via-tipo").addEventListener("change", function(e){ state.via.tipo = e.target.value; render(); });
+  document.getElementById("via-faixas").addEventListener("change", function(e){ state.via.faixas = Number(e.target.value); render(); });
+  document.getElementById("via-sentido").addEventListener("change", function(e){ state.via.sentido = e.target.value; render(); });
+
+  // ---------- CTB list ----------
+  function renderCtb(){
+    var ul = document.getElementById("ctb-list");
+    ul.innerHTML = "";
+    if(state.ctb.length === 0){
+      var li = document.createElement("li");
+      li.className = "ctb-item";
+      li.style.borderLeftColor = "var(--border)";
+      li.innerHTML = '<span style="color:var(--ink-dim);">Nenhuma referência ainda. Use a IA ou adicione manualmente.</span>';
+      ul.appendChild(li);
+      return;
+    }
+    state.ctb.forEach(function(item, idx){
+      var li = document.createElement("li");
+      li.className = "ctb-item";
+      li.innerHTML = '<strong>'+escapeXml(item.artigo)+'</strong>'+escapeXml(item.descricao)
+        + '<button class="rm" data-idx="'+idx+'">remover</button>';
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll(".rm").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        state.ctb.splice(Number(btn.dataset.idx),1);
+        renderCtb();
+      });
+    });
+  }
+  document.getElementById("btn-ctb-add").addEventListener("click", function(){
+    var art = document.getElementById("ctb-art").value.trim();
+    var desc = document.getElementById("ctb-desc").value.trim();
+    if(!art || !desc) return;
+    state.ctb.push({artigo:art, descricao:desc});
+    document.getElementById("ctb-art").value = "";
+    document.getElementById("ctb-desc").value = "";
+    renderCtb();
+  });
+
+  // ---------- clear ----------
+  document.getElementById("btn-clear").addEventListener("click", function(){
+    if(!confirm("Limpar todos os elementos do croqui?")) return;
+    state.elementos = [];
+    state.ctb = [];
+    selectedId = null;
+    render();
+    renderCtb();
+  });
+
+  // ---------- export JSON ----------
+  document.getElementById("btn-export-json").addEventListener("click", function(){
+    var data = {
+      cabecalho: {
+        local: document.getElementById("f-local").value,
+        data: document.getElementById("f-data").value,
+        hora: document.getElementById("f-hora").value,
+        numero: document.getElementById("f-numero").value
+      },
+      via: state.via,
+      elementos: state.elementos,
+      ctb: state.ctb
+    };
+    var blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "croqui-colisao.json";
+    a.click();
+  });
+
+  // ---------- export PNG ----------
+  document.getElementById("btn-export-png").addEventListener("click", function(){
+    var wasSelected = selectedId;
+    selectedId = null;
+    render();
+
+    var clone = svgEl.cloneNode(true);
+    clone.setAttribute("xmlns", SVG_NS);
+
+    // add header text (local/data/hora/numero) at top on export
+    var meta = document.getElementById("f-local").value + "   "
+      + document.getElementById("f-data").value + "   "
+      + document.getElementById("f-hora").value + "   "
+      + document.getElementById("f-numero").value;
+    if(meta.trim().replace(/\s+/g,"")){
+      var t = document.createElementNS(SVG_NS,"text");
+      t.setAttribute("x",16); t.setAttribute("y",22);
+      t.setAttribute("font-size","14"); t.setAttribute("font-family","IBM Plex Mono");
+      t.setAttribute("fill","#2c333c");
+      t.textContent = meta;
+      clone.appendChild(t);
+    }
+
+    // resolve CSS variables to literal colors for canvas export
+    var cssVars = {
+      "--paper":"#efe9d6","--grid-line":"#d9d0b4","--road":"#5c6067","--road-edge":"#f4f1e6",
+      "--blueprint":"#4d84ad","--accent":"#e2672b","--accent-2":"#f2b705","--danger":"#b4362b"
+    };
+    var svgString = clone.outerHTML;
+    Object.keys(cssVars).forEach(function(k){
+      svgString = svgString.split("var("+k+")").join(cssVars[k]);
+    });
+
+    var svgBlob = new Blob([svgString], {type:"image/svg+xml;charset=utf-8"});
+    var url = URL.createObjectURL(svgBlob);
+    var img = new Image();
+    img.onload = function(){
+      var canvas = document.createElement("canvas");
+      var scale = 2;
+      canvas.width = CW*scale; canvas.height = CH*scale;
+      var ctx = canvas.getContext("2d");
+      ctx.scale(scale,scale);
+      ctx.drawImage(img,0,0,CW,CH);
+      URL.revokeObjectURL(url);
+      var a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "croqui-colisao.png";
+      a.click();
+      selectedId = wasSelected;
+      render();
+    };
+    img.onerror = function(){
+      alert("Não foi possível gerar o PNG neste navegador. Tente 'Exportar JSON' ou use o print/screenshot da tela.");
+      selectedId = wasSelected;
+      render();
+    };
+    img.src = url;
+  });
+
+  // ---------- AI suggestion ----------
+  // The prompt/schema instructions now live server-side (server.js) next to the API key.
+  // The browser only ever talks to our own backend at /api/suggest.
+
+  document.getElementById("btn-ai").addEventListener("click", function(){
+    var text = document.getElementById("dyn-text").value.trim();
+    var statusEl = document.getElementById("ai-status");
+    var btn = document.getElementById("btn-ai");
+    if(!text){
+      statusEl.textContent = "Descreva a dinâmica da colisão primeiro.";
+      statusEl.className = "error";
+      return;
+    }
+    btn.disabled = true;
+    statusEl.textContent = "Gerando sugestão...";
+    statusEl.className = "";
+
+    fetch("/api/suggest", {
+      method: "POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({ text: text })
+    })
+    .then(function(r){
+      return r.json().then(function(data){
+        if(!r.ok){
+          var msg = (data && data.error && data.error.message) ? data.error.message : ("HTTP " + r.status);
+          throw new Error(msg);
+        }
+        return data;
+      });
+    })
+    .then(function(data){
+      if(data && data.error){
+        throw new Error(data.error.message || "Erro retornado pela API");
+      }
+      var textBlocks = (data.content||[]).filter(function(b){return b.type==="text";}).map(function(b){return b.text;});
+      var raw = textBlocks.join("\n").trim();
+      if(!raw) throw new Error("Resposta vazia da IA.");
+      var parsed = extractJson(raw);
+      applySuggestion(parsed);
+      statusEl.textContent = "Sugestão aplicada. Ajuste os elementos conforme necessário.";
+      statusEl.className = "ok";
+    })
+    .catch(function(err){
+      console.error("Falha ao gerar sugestão via IA online:", err);
+      var detail = (err && err.message) ? err.message : String(err);
+      try{
+        var fallback = heuristicSuggest(text);
+        applySuggestion(fallback);
+        statusEl.textContent = "IA online indisponível neste ambiente (" + detail + "). Gerei uma sugestão básica localmente a partir de palavras-chave — revise e ajuste manualmente.";
+        statusEl.className = "error";
+      } catch(e2){
+        console.error("Falha também na sugestão local:", e2);
+        statusEl.textContent = "Não foi possível gerar nenhuma sugestão (" + detail + "). Monte o croqui manualmente.";
+        statusEl.className = "error";
+      }
+    })
+    .finally(function(){ btn.disabled = false; });
+  });
+
+  // ---------- local heuristic fallback (no external API, runs fully client-side) ----------
+  function heuristicSuggest(text){
+    var lower = text.toLowerCase();
+    var via = { tipo: "reta_h", faixas: 2, sentido: "duplo" };
+
+    if(/rotat[oó]ria/.test(lower)) via.tipo = "rotatoria";
+    else if(/cruzamento|interse[cç][aã]o|esquina/.test(lower)) via.tipo = "cruzamento";
+    else if(/\bcurva\b/.test(lower)) via.tipo = "curva";
+
+    if(/m[aã]o [uú]nica|sentido [uú]nico/.test(lower)) via.sentido = "unico";
+
+    var faixaMatch = lower.match(/(\d+)\s*faixas?/);
+    if(faixaMatch){
+      var n = Number(faixaMatch[1]);
+      if(n>=1 && n<=4) via.faixas = n;
+    }
+
+    var elementos = [];
+    var cx = via.tipo === "cruzamento" || via.tipo === "rotatoria" ? 500 : 500;
+    var cy = 325;
+
+    // named vehicles like "veículo A", "veículo B"
+    var named = [];
+    var re = /ve[ií]culo\s+([a-z])\b/gi, m;
+    while((m = re.exec(text)) !== null){
+      var letter = m[1].toUpperCase();
+      if(named.indexOf(letter) === -1) named.push(letter);
+    }
+    var plateRe = /\b([A-Z]{3}\s?-?\s?\d[A-Z0-9]\d{2}|\b[A-Z]{3}-?\d{4})\b/g;
+    var plates = text.toUpperCase().match(plateRe) || [];
+
+    var placedVehicle = false;
+    var slots = [ {x:150,y:cy-30,rot:0}, {x:cx-30,y:120,rot:90}, {x:850,y:cy+30,rot:180}, {x:cx+30,y:530,rot:270} ];
+    named.forEach(function(letter, idx){
+      var slot = slots[idx % slots.length];
+      var label = "Veículo " + letter + (plates[idx] ? " (" + plates[idx] + ")" : "");
+      elementos.push({tipo:"carro", x:slot.x, y:slot.y, rot:slot.rot, label:label});
+      elementos.push({tipo:"seta", x:slot.x, y:slot.y, rot:slot.rot, label:"trajetória " + letter, length:130});
+      placedVehicle = true;
+    });
+
+    var vehicleTypes = [
+      {re:/moto(cicleta)?/, tipo:"moto"},
+      {re:/caminh[aã]o/, tipo:"caminhao"},
+      {re:/[oô]nibus/, tipo:"onibus"},
+      {re:/bicicleta|ciclista/, tipo:"bicicleta"},
+      {re:/pedestre/, tipo:"pedestre"}
+    ];
+    vehicleTypes.forEach(function(v, idx){
+      if(v.re.test(lower)){
+        var slot = slots[(named.length + idx) % slots.length];
+        elementos.push({tipo:v.tipo, x:slot.x, y:slot.y, rot:slot.rot, label: ICONS[v.tipo].label});
+        placedVehicle = true;
+      }
+    });
+
+    if(!placedVehicle && /carro|ve[ií]culo/.test(lower)){
+      elementos.push({tipo:"carro", x:150, y:cy-30, rot:0, label:"Veículo"});
+      if(plates[0]) elementos.push({tipo:"texto", x:150, y:cy-55, rot:0, label:plates[0]});
+    }
+
+    if(/sinal de pare|placa de pare|parada obrigat[oó]ria/.test(lower)){
+      elementos.push({tipo:"placa_pare", x:cx-70, y:cy-90, rot:0, label:"PARE"});
+    }
+    if(/sem[aá]foro/.test(lower)){
+      elementos.push({tipo:"semaforo", x:cx+70, y:cy-90, rot:0, label:"Semáforo"});
+    }
+    if(/faixa de pedestre/.test(lower)){
+      elementos.push({tipo:"faixa_pedestre", x:cx, y:cy+100, rot:90, label:"Faixa de pedestre"});
+    }
+    if(/radar/.test(lower)){
+      elementos.push({tipo:"radar", x:cx+130, y:cy-40, rot:0, label:"Radar"});
+    }
+
+    elementos.push({tipo:"ponto_colisao", x:cx, y:cy, rot:0, label:"Ponto de colisão"});
+
+    var ctb = [];
+    if(/ignor(ou|ando)[^.]*pare|avan[cç]ou[^.]*sinal|desrespeit(ou|ando)[^.]*sinal|furou[^.]*sinal/.test(lower)){
+      ctb.push({artigo:"Art. 208", descricao:"Avançar o sinal vermelho do semáforo ou o de parada obrigatória (infração gravíssima)."});
+    }
+
+    return { via: via, elementos: elementos.slice(0,8), ctb: ctb };
+  }
+
+  // Robustly pull a JSON object out of the model's raw text response,
+  // tolerating code fences, stray prose, or trailing commas.
+  function extractJson(raw){
+    var cleaned = raw.replace(/```json/gi,"").replace(/```/g,"").trim();
+    var start = cleaned.indexOf("{");
+    var end = cleaned.lastIndexOf("}");
+    if(start === -1 || end === -1 || end < start){
+      throw new Error("A resposta da IA não continha um JSON reconhecível.");
+    }
+    var jsonStr = cleaned.slice(start, end+1);
+    try{
+      return JSON.parse(jsonStr);
+    } catch(e1){
+      // try removing trailing commas before } or ]
+      var repaired = jsonStr.replace(/,\s*([}\]])/g, "$1");
+      try{
+        return JSON.parse(repaired);
+      } catch(e2){
+        throw new Error("Não foi possível interpretar o JSON da IA (" + e2.message + ").");
+      }
+    }
+  }
+
+  function applySuggestion(parsed){
+    if(parsed.via){
+      state.via.tipo = ["reta_h","reta_v","cruzamento","rotatoria","curva"].indexOf(parsed.via.tipo)>=0 ? parsed.via.tipo : state.via.tipo;
+      state.via.faixas = [1,2,3,4].indexOf(Number(parsed.via.faixas))>=0 ? Number(parsed.via.faixas) : state.via.faixas;
+      state.via.sentido = ["unico","duplo"].indexOf(parsed.via.sentido)>=0 ? parsed.via.sentido : state.via.sentido;
+      document.getElementById("via-tipo").value = state.via.tipo;
+      document.getElementById("via-faixas").value = String(state.via.faixas);
+      document.getElementById("via-sentido").value = state.via.sentido;
+    }
+    if(Array.isArray(parsed.elementos)){
+      state.elementos = [];
+      parsed.elementos.slice(0,8).forEach(function(e){
+        if(!ICONS[e.tipo]) return;
+        addElement(e.tipo, {
+          x: clampNum(e.x, 0, CW, CW/2),
+          y: clampNum(e.y, 0, CH, CH/2),
+          rot: clampNum(e.rot, -360, 360, 0),
+          label: typeof e.label === "string" && e.label.trim() ? e.label.trim() : undefined,
+          extra: e.tipo === "seta" ? {length: clampNum(e.length, 40, 400, 120)} : {}
+        });
+      });
+      selectedId = null;
+    }
+    if(Array.isArray(parsed.ctb)){
+      state.ctb = parsed.ctb.filter(function(c){return c && c.artigo && c.descricao;}).slice(0,5);
+      renderCtb();
+    }
+    render();
+  }
+  function clampNum(v, min, max, fallback){
+    var n = Number(v);
+    if(isNaN(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+  }
+
+  // ---------- init ----------
+  render();
+  renderCtb();
+})();
+</script>
+</body>
+</html>
