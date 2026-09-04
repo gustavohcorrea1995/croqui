@@ -1101,9 +1101,15 @@
       if(n>=1 && n<=4) via.faixas = n;
     }
 
+    // Orientação cardeal explícita, quando a via é reta (sem cruzamento/rotatória/curva)
+    if(via.tipo === "reta_h"){
+      if(/norte[\s-]*sul|sul[\s-]*norte/.test(lower)) via.tipo = "reta_v";
+      else if(/leste[\s-]*oeste|oeste[\s-]*leste/.test(lower)) via.tipo = "reta_h";
+    }
+
     var elementos = [];
-    var cx = via.tipo === "cruzamento" || via.tipo === "rotatoria" ? 500 : 500;
-    var cy = 325;
+    var cx = 500, cy = 325;
+    var rearEnd = /colidiu\s+(na|contra a)\s+traseira|bateu\s+na\s+traseira|n[aã]o\s+guardou\s+dist[aâ]ncia|engavetamento|colis[aã]o\s+traseira/.test(lower);
 
     // named vehicles like "veículo A", "veículo B"
     var named = [];
@@ -1116,14 +1122,24 @@
     var plates = text.toUpperCase().match(plateRe) || [];
 
     var placedVehicle = false;
-    var slots = [ {x:150,y:cy-30,rot:0}, {x:cx-30,y:120,rot:90}, {x:850,y:cy+30,rot:180}, {x:cx+30,y:530,rot:270} ];
-    named.forEach(function(letter, idx){
-      var slot = slots[idx % slots.length];
-      var label = "Veículo " + letter + (plates[idx] ? " (" + plates[idx] + ")" : "");
-      elementos.push({tipo:"carro", x:slot.x, y:slot.y, rot:slot.rot, label:label});
-      elementos.push({tipo:"seta", x:slot.x, y:slot.y, rot:slot.rot, label:"trajetória " + letter, length:130});
+
+    if(rearEnd && named.length >= 2){
+      // Duas viaturas em fila, mesma direção, colisão entre elas.
+      elementos.push({tipo:"carro", x:250, y:cy, rot:0, label:"Veículo " + named[0] + (plates[0] ? " (" + plates[0] + ")" : "")});
+      elementos.push({tipo:"carro", x:520, y:cy, rot:0, label:"Veículo " + named[1] + (plates[1] ? " (" + plates[1] + ")" : "")});
+      elementos.push({tipo:"seta", x:100, y:cy-30, rot:0, label:"sentido do fluxo", length:600});
+      cx = 480; cy = cy;
       placedVehicle = true;
-    });
+    } else {
+      var slots = [ {x:150,y:cy-30,rot:0}, {x:cx-30,y:120,rot:90}, {x:850,y:cy+30,rot:180}, {x:cx+30,y:530,rot:270} ];
+      named.forEach(function(letter, idx){
+        var slot = slots[idx % slots.length];
+        var label = "Veículo " + letter + (plates[idx] ? " (" + plates[idx] + ")" : "");
+        elementos.push({tipo:"carro", x:slot.x, y:slot.y, rot:slot.rot, label:label});
+        elementos.push({tipo:"seta", x:slot.x, y:slot.y, rot:slot.rot, label:"trajetória " + letter, length:130});
+        placedVehicle = true;
+      });
+    }
 
     var vehicleTypes = [
       {re:/moto(cicleta)?/, tipo:"moto"},
@@ -1134,8 +1150,8 @@
     ];
     vehicleTypes.forEach(function(v, idx){
       if(v.re.test(lower)){
-        var slot = slots[(named.length + idx) % slots.length];
-        elementos.push({tipo:v.tipo, x:slot.x, y:slot.y, rot:slot.rot, label: ICONS[v.tipo].label});
+        var slot2 = [ {x:150,y:cy-30,rot:0}, {x:cx-30,y:120,rot:90}, {x:850,y:cy+30,rot:180}, {x:cx+30,y:530,rot:270} ][(named.length + idx) % 4];
+        elementos.push({tipo:v.tipo, x:slot2.x, y:slot2.y, rot:slot2.rot, label: ICONS[v.tipo].label});
         placedVehicle = true;
       }
     });
@@ -1164,8 +1180,20 @@
     if(/ignor(ou|ando)[^.]*pare|avan[cç]ou[^.]*sinal|desrespeit(ou|ando)[^.]*sinal|furou[^.]*sinal/.test(lower)){
       ctb.push({artigo:"Art. 208", descricao:"Avançar o sinal vermelho do semáforo ou o de parada obrigatória (infração gravíssima)."});
     }
+    if(/excesso de velocidade|em alta velocidade|velocidade acima do (limite|permitido)|ultrapassava o limite de velocidade/.test(lower)){
+      ctb.push({artigo:"Art. 218", descricao:"Transitar em velocidade superior à máxima permitida para o local (infração média, grave ou gravíssima conforme o excesso)."});
+    }
+    if(/embriagad|alcoolizad|sob (o )?efeito de [aá]lcool|baf[oô]metro|dirigia (b[eê]bad|alcoolizad)/.test(lower)){
+      ctb.push({artigo:"Art. 306", descricao:"Conduzir veículo com capacidade psicomotora alterada por álcool ou outra substância psicoativa (crime de trânsito)."});
+    }
+    if(/fugiu (do local|sem prestar socorro)|evadiu-se|n[aã]o parou para prestar socorro|fugiu ap[oó]s (o|a) (acidente|colis[aã]o)/.test(lower)){
+      ctb.push({artigo:"Art. 305", descricao:"Afastar-se o condutor do local do acidente para fugir à responsabilidade penal ou civil (crime de trânsito)."});
+    }
+    if(rearEnd){
+      ctb.push({artigo:"Art. 192", descricao:"Deixar de guardar distância de segurança lateral e frontal entre os veículos (infração grave)."});
+    }
 
-    return { via: via, elementos: elementos.slice(0,8), ctb: ctb };
+    return { via: via, elementos: elementos.slice(0,8), ctb: ctb.slice(0,5) };
   }
 
   // Robustly pull a JSON object out of the model's raw text response,
